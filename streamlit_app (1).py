@@ -48,7 +48,14 @@ def summarize_long_text(text, chunk_size=1000, max_chunks=5):
 
 # Metadata Generator
 def generate_metadata(text, doc_type="Unknown"):
+    # Generate summary
     summary = summarize_long_text(text)
+    
+    # Generate title (via summarizer)
+    title_prompt = "Generate a title for the following document: " + text[:1000]
+    title_result = summarizer(title_prompt, max_length=15, min_length=4, do_sample=False)
+    title = title_result[0]["summary_text"].strip().upper()
+    
     keywords = kw_model.extract_keywords(
         text,
         keyphrase_ngram_range=(1, 2),
@@ -56,14 +63,14 @@ def generate_metadata(text, doc_type="Unknown"):
         top_n=8
     )
     return {
-        "title": summary.split('.')[0],
-        "summary": summary,
-        "keywords": [kw[0] for kw in keywords],
-        "document_type": doc_type,
-        "word_count": len(text.split())
+        "TITLE": title,
+        "SUMMARY": summary,
+        "KEYWORDS": [kw[0] for kw in keywords],
+        "DOCUMENT_TYPE": doc_type,
+        "WORD_COUNT": len(text.split())
     }
 
-# Enhanced UI Layout
+# UI Layout
 st.set_page_config(page_title="AutoMeta Metadata Generator", layout="wide")
 
 with st.container():
@@ -73,7 +80,7 @@ with st.container():
         <hr style='margin-top:0;'>
     """, unsafe_allow_html=True)
 
-uploaded = st.file_uploader("📤 Upload Document", type=["pdf", "docx", "txt"], help="Supported formats: PDF, DOCX, TXT")
+uploaded = st.file_uploader(" Upload Document", type=["pdf", "docx", "txt"], help="Supported formats: PDF, DOCX, TXT")
 
 if uploaded:
     with NamedTemporaryFile(delete=False, suffix=Path(uploaded.name).suffix) as tmp_file:
@@ -100,23 +107,30 @@ if uploaded:
         doc_type = "TXT"
 
     if text:
-        st.success("✅ Document processed successfully.")
+        st.success(" Document processed successfully.")
         metadata = generate_metadata(text, doc_type)
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("### 📑 JSON Metadata")
+            st.markdown("<h3 style='color: black; font-weight: bold;'> JSON METADATA</h3>", unsafe_allow_html=True)
             st.json(metadata)
+            json_str = json.dumps(metadata, indent=2)
+            st.download_button(
+                label="⬇DOWNLOAD JSON",
+                data=json_str,
+                file_name="metadata.json",
+                mime="application/json"
+            )
 
         with col2:
-            st.markdown("### 📋 YAML Metadata")
+            st.markdown("<h3 style='color: black; font-weight: bold;'> YAML METADATA</h3>", unsafe_allow_html=True)
             st.code(yaml.dump(metadata, sort_keys=False), language="yaml")
-
-        with st.expander("📖 Full Text Extracted"):
+            
+        with st.expander(" Full Text Extracted"):
             st.text_area("Extracted Text", text, height=200)
     else:
-        st.error("❌ Could not extract text from the file.")
+        st.error(" Could not extract text from the file.")
 
 else:
     st.info("Please upload a document to begin.")
